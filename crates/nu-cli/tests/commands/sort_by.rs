@@ -1,4 +1,4 @@
-use nu_test_support::{nu, pipeline};
+use nu_test_support::{nu, nu_error, pipeline};
 
 #[test]
 fn by_column() {
@@ -20,6 +20,23 @@ fn by_column() {
     ));
 
     assert_eq!(actual, "description");
+}
+
+#[test]
+fn errors_sorting_by_non_existent_column() {
+
+    let actual = nu_error!(
+        cwd: "tests/fixtures/formats",pipeline(
+        r#"
+            ls
+            | sort-by NOSUCHCOLUMN
+        "#
+        ));
+
+    assert!(
+            actual.contains("Unknown column"),
+            format!("actual: {:?}", actual)
+    );
 }
 
 #[test]
