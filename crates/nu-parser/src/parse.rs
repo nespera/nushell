@@ -1360,3 +1360,60 @@ fn unit_parse_byte_units() -> Result<(), ParseError> {
     }
     Ok(())
 }
+
+#[test]
+fn parse_internal_command_flags() -> Result<(), ParseError> {
+    let signature = Signature::build("fire")
+        .required("name", SyntaxShape::String, "the name of the weapon")
+        .required("shots", SyntaxShape::Number, "the number of shots");
+
+    #[derive(Debug, Clone)]
+    struct DummyRegistry {}
+
+    impl SignatureRegistry for DummyRegistry {
+        fn has(&self, _name: &str) -> bool {
+            false
+        }
+        fn get(&self, _name: &str) -> Option<nu_protocol::Signature> {
+            None
+        }
+        fn clone_box(&self) -> Box<dyn SignatureRegistry> {
+            Box::new(self.clone())
+        }
+    }
+
+    fn str_span(x: usize, s: &str) -> Spanned<String> {
+        Spanned {
+            span: Span::new(x, x + s.len()),
+            item: String::from(s),
+        }
+    }
+
+    let lite_cmd = LiteCommand {
+        name: str_span(0, "fire"),
+        args: vec![str_span(4, "cannon"), str_span(8, "-10")],
+    };
+    let registry = DummyRegistry {};
+    let (cmd, parse_error) = parse_internal_command(&lite_cmd, &registry, &signature, 0);
+
+    assert_eq!(cmd.name, "fire");
+    let positional = cmd.args.positional.unwrap();
+    match &positional.get(0).unwrap().expr {
+        Expression::Literal(hir::Literal::String(x)) => assert_eq!(*x, String::from("cannon")),
+        e => panic!(format!(
+            "expected 1st arg to be a string literal, was  {:?}",
+            e
+        )),
+    }
+    match &positional.get(1).unwrap().expr {
+        Expression::Literal(hir::Literal::Number(x)) => {
+            assert_eq!(*x, hir::Number::Int(BigInt::from(-10)))
+        }
+        e => panic!(format!(
+            "expected 2nd arg to be an int literal, was  {:?}",
+            e
+        )),
+    }
+    assert_eq!(parse_error, None);
+    Ok(())
+}
